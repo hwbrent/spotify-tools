@@ -34,6 +34,10 @@ import {
     APIPlaylistObject, APITrackObject, APIUserObject
 } from "../types";
 
+require("dotenv").config();
+
+/////////////////////////////////////
+
 export function HomePage() {
 
     useEffect(() => {
@@ -77,9 +81,9 @@ export function Callback() {
                     // console.log("Success!");
                     // console.log(token);
                     setText(JSON.stringify(token));
-
                     const params = x_www_form_urlencoded(token);
-                    window.location.replace("http://localhost:3000/tokenacquired?" + params);
+                    // window.location.replace("http://localhost:3000/tokenacquired?" + params);
+                    window.location.replace(process.env.REACT_APP_TOKEN_ACQUIRED_URI + "?" + params);
                 }
             }
         }
@@ -109,7 +113,9 @@ export function TokenAcquired() {
             if (!url_access_token || !url_refresh_token) { // if there was an error
                 console.log(url_access_token);
                 alert(urlParams.toString());
-                window.location.replace("http://localhost:3000/"); // goes back to the login page
+                // window.location.replace("http://localhost:3000/"); // goes back to the login page
+                // window.location.replace(process.env.REACT_APP_BASE_URI); // goes back to the login page
+                window.location.replace(process.env.REACT_APP_BASE_URI || "https://hwbrent-spotify-tools.netlify.app/"); // goes back to the login page
                 return
             }
             setAccessToken(url_access_token);

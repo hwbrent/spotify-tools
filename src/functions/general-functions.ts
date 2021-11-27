@@ -139,7 +139,8 @@ export async function requestAuth() {
     const params = {
         client_id: process.env.REACT_APP_CLIENT_ID,
         response_type: "code",
-        redirect_uri: "http://localhost:3000/callback",
+        // redirect_uri: "http://localhost:3000/callback",
+        redirect_uri: process.env.REACT_APP_REDIRECT_URI,
         // state: "",
         scope: scopes.join(" "),
         show_dialog: "true" //,
@@ -158,7 +159,8 @@ export async function fetchToken(code: string) {
     const body = {
         grant_type: "authorization_code",
         code: code,
-        redirect_uri: "http://localhost:3000/callback"
+        // redirect_uri: "http://localhost:3000/callback"
+        redirect_uri: process.env.REACT_APP_REDIRECT_URI
     };
     const headerPart = Buffer.from(
         process.env.REACT_APP_CLIENT_ID +
@@ -185,7 +187,9 @@ export async function fetchToken(code: string) {
 }
 
 export function refreshAccessToken() {
-    window.location.replace("http://localhost:3000/?" + "refresh");
+    const uri = process.env.REACT_APP_REFRESH_URI || "https://hwbrent-spotify-tools.netlify.app/?refresh";
+    window.location.replace(uri);
+    // window.location.replace("http://localhost:3000/?" + "refresh");
 }
 
 export function useForceRerender(){
