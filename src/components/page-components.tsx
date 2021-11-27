@@ -39,6 +39,7 @@ require("dotenv").config();
 /////////////////////////////////////
 
 export function HomePage() {
+    console.log("Loaded <HomePage/>");
 
     useEffect(() => {
         if (window.location.search === "?refresh") document.getElementById("login")?.click(); // sketchy but seems to work
@@ -63,12 +64,15 @@ export function HomePage() {
 }
 
 export function Callback() {
+    console.log("Loaded <Callback/>");
+
     const [ text, setText ] = useState<string>("");
     const [ token, setToken ] = useState<undefined|object>();
 
     useEffect(
         () => {
             const urlParams = new URLSearchParams(window.location.search);
+            console.log("urlParams:", urlParams);
             if (urlParams.get("error")) setText("Login didn't work");
 
             const code = urlParams.get("code");
@@ -96,6 +100,7 @@ export function Callback() {
 }
 
 export function TokenAcquired() {
+    console.log("Loaded <TokenAcquired/>");
     /*
     This will be the main component where the user does all their customising stuff
     */
