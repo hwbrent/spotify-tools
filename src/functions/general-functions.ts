@@ -146,7 +146,8 @@ export async function requestAuth() {
         // code_challenge_method: "S256",
         // code_challenge: ""
     };
-    // const formattedQueryParams = new URLSearchParams(JSON.stringify(queryParams)).toString();
+
+    console.log(params);
 
     const redirect = 'https://accounts.spotify.com/authorize?' + x_www_form_urlencoded(params);
     window.location.replace(redirect);
