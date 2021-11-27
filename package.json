@@ -1,6 +1,6 @@
 {
   "name": "spotify-tools-2",
-  "homepage": "https://hwbrent.github.io/spotify-tools/",
+  "homepage": "/",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
@@ -12,7 +12,6 @@
     "@types/react-dom": "^17.0.10",
     "@types/react-router-dom": "^5.3.2",
     "cors": "^2.8.5",
-    "nodemon": "^2.0.14",
     "querystring": "^0.2.1",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
@@ -24,12 +23,9 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d build",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "server": "npx nodemon ./src/server/server.js"
+    "eject": "react-scripts eject"
   },
   "eslintConfig": {
     "extends": [

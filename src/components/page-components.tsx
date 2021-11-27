@@ -1,5 +1,5 @@
 import { access } from 'fs';
-import React, { useState, useEffect, BaseSyntheticEvent } from 'react';
+import React, { useState, useEffect, useRef, BaseSyntheticEvent } from 'react';
 import {
     BrowserRouter as Router,
     Switch,
@@ -13,19 +13,19 @@ import {
     fetchToken,
     areEqual,
     x_www_form_urlencoded,
-    fetchAllArtists,
-    fetchAllArtistsGenerator,
+    fetchAllArtistsAndTracks2,
     fetchCurrentUserProfile,
-    useForceRerender
+    useForceRerender,
+    refreshAccessToken
 } from "../functions/general-functions";
-// import { getArrayOfTracks } from "../functions/tracks";
-import {  } from "../functions/playlists";
+import { fetchAllSavedTracks, fetchNumberOfSavedTracks } from "../functions/tracks";
+import { fetchAllPlaylists } from "../functions/playlists";
 
 // components:
 import {
     MainBody,
     Nav,
-    ListOfArtists
+    SeeArtistAllTracks
 } from "./sub-components";
 
 // types/interfaces
@@ -36,21 +36,15 @@ import {
 
 export function HomePage() {
 
-    /*
     useEffect(() => {
-        async function fetchData() {
-            const url = await requestAuth();
-            console.log(url);
-        }
-        fetchData();
+        if (window.location.search === "?refresh") document.getElementById("login")?.click(); // sketchy but seems to work
     }, [])
-    */
 
     const button = (
         <label>
             Click this button to open the Spotify login dialog
             {/*<button type="button" onClick={() => window.location.replace("http://localhost:1234/login")}>*/}
-            <button type="button" onClick={async () => requestAuth()}>
+            <button id="login" type="button" onClick={async () => requestAuth()}>
                 Click
             </button>
         </label>
@@ -58,14 +52,14 @@ export function HomePage() {
 
     return (
         <>
-        Welcome :)
+        Welcome :) <br/>
         {button}
         </>
     );
 }
 
 export function Callback() {
-    const [ text, setText ] = useState<any>();
+    const [ text, setText ] = useState<string>("");
     const [ token, setToken ] = useState<undefined|object>();
 
     useEffect(
@@ -75,15 +69,13 @@ export function Callback() {
 
             const code = urlParams.get("code");
             if (code) {
-                fetchToken(code).then(data => {
-                    setToken(data);
-                });
+                fetchToken(code).then(data => setToken(data));
             };
 
-            if (token && !text) {
+            if (token && text === "") {
                 if (!areEqual(token, {"error": "invalid_grant", "error_description": "Invalid authorization code"})) {
-                    console.log("Success!");
-                    console.log(token);
+                    // console.log("Success!");
+                    // console.log(token);
                     setText(JSON.stringify(token));
 
                     const params = x_www_form_urlencoded(token);
@@ -95,7 +87,6 @@ export function Callback() {
     
     return (
         <>
-        {text}
         </>
     );
 }
@@ -124,31 +115,33 @@ export function TokenAcquired() {
             setAccessToken(url_access_token);
             setRefreshToken(url_refresh_token);
 
-            fetchCurrentUserProfile(accessToken)
-            .then(response => {
-                setCurrentUserProfile(response);
-            })
-            .catch(error => console.error(error));
-
+            if (accessToken !== "") {
+                fetchCurrentUserProfile(accessToken)
+                    .then(response => {
+                        setCurrentUserProfile(response);
+                    })
+                    .catch(error => console.error(error));
+            }
         },
         []
     );
 
-    if (accessToken.length === 0) return <p>Fuck</p>;
+    if (accessToken.length === 0) return <p>Nooo...</p>;
 
     const testButton = (
         <label>
             Click here to do a lil testy test:
             <button type="button" onClick={async () => {
-                if (accessToken.length !== 0) {
-                    // const data = await getArrayOfTracks(accessToken);
-                }
+                if (accessToken.length !== 0) {}
+                alert("Access token expired - getting new one...");
+                refreshAccessToken();
             }}>Click</button>
         </label>
     );
 
     const pairings = {
-        "List of all artists": <ListOfArtists accessToken={accessToken}/>
+        // "List of all artists": <ListOfArtists accessToken={accessToken} refreshToken={refreshToken}/>,
+        "See all songs for each artist": <SeeArtistAllTracks accessToken={accessToken} refreshToken={refreshToken}/>
     }
 
     const handleLIClick = (event: BaseSyntheticEvent) => {
@@ -156,8 +149,6 @@ export function TokenAcquired() {
         const pageComponent = Object.entries(pairings).filter(entry => entry[0] === pageName)[0][1];
         setChosenPage(pageComponent);
     }
-
-    // console.log("ARTISTS:", artists);
 
     const out = (
         <>

@@ -9,7 +9,6 @@ import {
   HomePage,
   Callback,
   TokenAcquired,
-  // Nav
 } from "./components/page-components";
 
 function App() {

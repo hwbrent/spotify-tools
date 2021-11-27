@@ -117,6 +117,17 @@ export interface APITrackObject {
     "uri": string, // e.g. "spotify:track:2308VPPaMh7Q3AX1Zap99A"
 }
 
+export interface SubArtistObj {
+    "external_urls": {
+        "spotify": string, // e.g. "https://open.spotify.com/artist/711MCceyCBcFnzjGY4Q7Un"
+    },
+    "href": string, // e.g. "https://api.spotify.com/v1/artists/711MCceyCBcFnzjGY4Q7Un",
+    "id": string, // e.g. "711MCceyCBcFnzjGY4Q7Un",
+    "name": string, // e.g. "AC/DC",
+    "type": string, // e.g. "artist",
+    "uri": string, // e.g. "spotify:artist:711MCceyCBcFnzjGY4Q7Un"
+}
+
 export interface APIUserObject {
     "country": string,
     "display_name": string,
@@ -183,4 +194,10 @@ export interface ArtistFromTrack {
 
 export interface ArtistsAndTracks {
     [key: string]: Array<APITrackObject>
+}
+
+export interface YieldObject {
+    objKeys: Array<string>,
+    type: string,
+    count: number
 }
