@@ -33,8 +33,19 @@ import {
     YieldObject
 } from "../types";
 import userEvent from "@testing-library/user-event";
+import { stringify } from "querystring";
 
 require("dotenv").config();
+
+export const requestParamObject = (accessToken: string) => {
+    return {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${accessToken}`
+        }
+    }
+};
 
 export const APIRateLimitExceeded = {
     "error": {
@@ -107,6 +118,8 @@ export function delay(delayInms: number) {
       }, delayInms);
     });
 }
+
+// export function handleResponse(response: object) {}
 
 //////
 
@@ -211,13 +224,7 @@ You need to include the following header in every API call:
 
 export async function fetchCurrentUserProfile(accessToken: string) {
     console.log("getting current user profile...");
-    const response = await fetch("https://api.spotify.com/v1/me", {
-        method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${accessToken}`
-        }
-    });
+    const response = await fetch("https://api.spotify.com/v1/me", requestParamObject(accessToken));
     const data = await response.json();
 
     if (response.status !== 200) {
@@ -231,27 +238,53 @@ export async function fetchCurrentUserProfile(accessToken: string) {
     return data;
 }
 
+export const time_period = {
+    "long_term": "calculated from several years of data and including all new data as it becomes available",
+    "medium_term": "approximately last 6 months",
+    "short_term": "approximately last 4 weeks"
+}
+export async function fetchUserTopItems(
+    accessToken: string,
+    limit: number = 15,
+    offset: number = 0,
+    type: string = "artists", // "artists" or "tracks"
+    time_range: string = "medium_term", // "long term" (years of data), "medium_term" (~6 months), "short_term" (~ 4 weeks)
+) {
+    const params = {
+        limit: limit,
+        offset: offset,
+        time_range: time_range
+    }
+    const response = await fetch(
+        "https://api.spotify.com/v1/me/top/" + type + "/?" + x_www_form_urlencoded(params),
+        requestParamObject(accessToken)
+    );
+    const data = await response.json()
+
+    if (response.status !== 200) {
+        console.error(response);
+        console.error(data);
+    }
+
+    const time_period_match = Object.entries(time_period).filter((array: Array<string>) => {
+        if (array[0] === time_range) return array
+    })
+
+    const returnData = {
+        type: type,
+        time_range: time_period_match[0].join(" - ").replace("_", " "),
+        data: data.items
+    }
+
+    return returnData;
+}
+
 /////////////////////////////////////////////////////////////
 /////////////// These are the meaty functions ///////////////
 /////////////////////////////////////////////////////////////
 
-/*
-
-async function fetchAllArtists():
-
-- What I want to do is fetch a list of every single artist in the user's library
-- This includes artists of the songs in their playlists and their liked songs, but doesn't
-include playlists that aren't owned by the user
-
-- So I want to iterate through all of their playlists, and for every song in each playlist,
-get the artist/s and put them all into an array
-- At the same time it'd probably be a good idea to maintain an object with keys being the
-artists found, and values being an array of the hrefs of their songs
-
-*/
-
 // THIS IS THE ONE!!!
-export async function* fetchAllArtistsAndTracks2(accessToken: string, refreshToken: string) {
+export async function* fetchAllArtistsAndTracks2(accessToken: string, refreshToken?: string) {
     /*
     • This function is a generator
     • The reason why is because I wanted the subcomponents to be able to display the progress of the function
@@ -264,21 +297,17 @@ export async function* fetchAllArtistsAndTracks2(accessToken: string, refreshTok
     */
     const currentUserProfile = await fetchCurrentUserProfile(accessToken);
 
+    const artistsAndTracks: {[artist: string]: Array<APITrackObject>} = {};
 
-    interface ArtistsAndTracks {
-        [artist: string]: Array<APITrackObject>
-    }
-    const artistsAndTracks: ArtistsAndTracks = {};
-
+    const failedPlaylists: Array<number> = [];
     
     let playlistCount: number = 0;
-
     const allPlaylists = fetchAllPlaylists(accessToken, 50); // generator (or iterator? Idek what it's actually called)
     for await (let playlistBatch of allPlaylists) { // playlistBatch is an array of 50 playlist objects        
         // fetches the tracks from each playlist's playlist.tracks.href sub-object:
         if (typeof playlistBatch === "undefined") {
             console.log("error");
-            delay(2000);
+            // delay(2000);
             continue
         }
 
@@ -293,9 +322,8 @@ export async function* fetchAllArtistsAndTracks2(accessToken: string, refreshTok
                 continue;
             }
 
-            // / console.log(playlist.name,"\n",playlist.owner.display_name);
-
             const playlistTracks = await fetchTracksFromPlaylistTracksHREF2(accessToken, playlist.tracks.href, currentUserProfile);
+            
             
             // for each individual track object in playlistTracks:
             for (let track of playlistTracks) {
@@ -311,17 +339,18 @@ export async function* fetchAllArtistsAndTracks2(accessToken: string, refreshTok
 
             if (playlistCount <= i) playlistCount = i + 1;
             else playlistCount += 1;
+
+            if (typeof playlistTracks !== "object") failedPlaylists.push(playlistCount);
             
             // yield ["playlists", playlistCount];
             yield [0, playlistCount];
+            console.log(failedPlaylists);
         }
         // playlistCount += playlistBatch.length;
         // yield ["playlists", playlistCount];
     }
 
-
     let trackCount: number = 0;
-
     const allSavedTracks = fetchAllSavedTracks(accessToken, 50);
     for await (let trackBatch of allSavedTracks) {
 
@@ -352,6 +381,8 @@ export async function* fetchAllArtistsAndTracks2(accessToken: string, refreshTok
     }
 
     console.log("Done formatting object!!! (I think...)");
-    // console.log(artistsAndTracks);
+    console.log(failedPlaylists);
+
     yield artistsAndTracks;
+    return artistsAndTracks;
 }

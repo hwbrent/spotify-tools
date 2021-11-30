@@ -16,16 +16,22 @@ import {
     fetchAllArtistsAndTracks2,
     fetchCurrentUserProfile,
     useForceRerender,
-    refreshAccessToken
+    refreshAccessToken,
+    fetchUserTopItems
 } from "../functions/general-functions";
 import { fetchAllSavedTracks, fetchNumberOfSavedTracks } from "../functions/tracks";
-import { fetchAllPlaylists } from "../functions/playlists";
+import {
+    fetchAllPlaylists,
+    fetchAllPlaylistNames
+} from "../functions/playlists";
 
 // components:
 import {
     MainBody,
     Nav,
-    SeeArtistAllTracks
+    SeeArtistAllTracks,
+    ListOfPlaylistNames,
+    SeeUserTop
 } from "./sub-components";
 
 // types/interfaces
@@ -142,32 +148,36 @@ export function TokenAcquired() {
 
     const testButton = (
         <label>
-            Click here to do a lil testy test:
+            DO NOT PRESS THIS BUTTON - THIS IS FOR THE DEVELOPER TO USE
             <button type="button" onClick={async () => {
-                if (accessToken.length !== 0) {}
-                alert("Access token expired - getting new one...");
-                refreshAccessToken();
+                if (accessToken.length !== 0) {
+                    const data = await fetchUserTopItems(accessToken);
+                    console.log(data);
+                }
+                /* alert("Access token expired - getting new one...");
+                refreshAccessToken(); */
             }}>Click</button>
         </label>
     );
 
     const pairings = {
-        // "List of all artists": <ListOfArtists accessToken={accessToken} refreshToken={refreshToken}/>,
-        "See all songs for each artist": <SeeArtistAllTracks accessToken={accessToken} refreshToken={refreshToken}/>
+        "List of all playlist names": <ListOfPlaylistNames accessToken={accessToken} />,
+        "See all songs for each artist": <SeeArtistAllTracks accessToken={accessToken} refreshToken={refreshToken} />,
+        "See user top artists and/or tracks": <SeeUserTop accessToken={accessToken} />
     }
 
-    const handleLIClick = (event: BaseSyntheticEvent) => {
+    const handleNavClick = (event: BaseSyntheticEvent) => {
         const pageName = event.target.innerHTML;
         const pageComponent = Object.entries(pairings).filter(entry => entry[0] === pageName)[0][1];
         setChosenPage(pageComponent);
     }
 
-    const out = (
+    const body = (
         <>
-        <p>Your access token is: <br/> {accessToken}</p>
-        <p>Your refresh token is: <br/> {refreshToken}</p>
-        <hr />
-        {testButton} <br />
+        {/* <p>Your access token is: <br/> {accessToken}</p> 
+        <p>Your refresh token is: <br/> {refreshToken}</p> 
+        <hr /> */}
+        {testButton} <hr />
         {chosenPage}
         </>
     );
@@ -178,9 +188,9 @@ export function TokenAcquired() {
         <hr/>
         <MainBody
             leftCol={
-                <Nav onClick={handleLIClick} pages={Object.keys(pairings)} />
+                <Nav onClick={handleNavClick} pages={Object.keys(pairings)} />
             }
-            rightCol={out}
+            rightCol={body}
         />
         </>
     );

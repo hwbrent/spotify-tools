@@ -5,16 +5,21 @@ import "../App.css";
 import {
     areEqual,
     fetchAllArtistsAndTracks2,
-    useForceRerender
+    fetchUserTopItems,
+    useForceRerender,
+    time_period
 } from "../functions/general-functions";
 import {
     fetchNumberOfSavedTracks
 } from "../functions/tracks";
 import {
-    fetchNumberOfPlaylists
+    fetchNumberOfPlaylists,
+    fetchAllPlaylistNames,
+    createArtistPlaylist
 } from "../functions/playlists";
 
 import {
+    APIArtistObject,
     APIPlaylistObject,
     APITrackObject,
     ArtistsAndTracks,
@@ -22,6 +27,7 @@ import {
     YieldObject
 } from "../types";
 import { type } from "os";
+import { stringify } from "querystring";
 
 //////////////////////////////////////////////////////////////
 ///// General components not related to the Spotify data /////
@@ -89,32 +95,138 @@ export function Datalist(props: DatalistProps) {
 ///// Components specifically related to the Spotify data /////
 ///////////////////////////////////////////////////////////////
 
+interface ArtistLIsProps {
+    artistNames: Array<string>,
+    onClick?: (event: BaseSyntheticEvent) => void
+}
+export function ArtistLIs(props: ArtistLIsProps) {
+    const mappedNames = props.artistNames.map((name: string, key: number) => (
+        <li key={key} onClick={props.onClick}>{name}</li>
+    ))
+    return <ul>{mappedNames}</ul>;
+}
+
+export function ListOfPlaylistNames(props: {accessToken: string}) {
+    // const [ playlistNames, setPlaylistNames ] = useState<Array<string>>([]);
+    const [ playlistNames, setPlaylistNames ] = useState<Array<Array<string>>>([]);
+
+    useEffect(() => {
+        async function fetchData() {
+            const response = await fetchAllPlaylistNames(props.accessToken);
+            setPlaylistNames(response);
+        }
+        fetchData();
+    }, []);
+
+    const mapped = playlistNames.map((entry: any, key: number) => {
+        return (
+        <li key={key}>
+            <b>{entry[0]}</b> - <i>{entry[1]}</i>
+        </li>
+        );
+    });
+
+    if (playlistNames.length === 0) return <code>Loading...</code>;
+    
+    return (
+        <>
+        <i>Total number of playlists: {playlistNames.length}</i>
+        <ul>{mapped}</ul>
+        </>
+    );
+}
+
+export function SeeUserTop(props: {accessToken: string}) {
+    interface Data {
+        type: string,
+        time_range: any, // this is fudged, time_range will be a string, but TS indexing of objects is annoying
+        data: Array<any>
+        // data: Array<APIArtistObject> | Array<APITrackObject>
+    }
+    const [ data, setData ] = useState<Data|any>({});
+    const [ typeChoice, setTypeChoice ] = useState<string>("artists");
+    const [ timeRangeChoice, setTimeRangeChoice ] = useState<string>("medium_term");
+
+    useEffect(() => {
+        async function fetchData() {
+            const response = await fetchUserTopItems(props.accessToken, 15, 0, "tracks");
+            setData(response);
+        }
+        fetchData();
+    }, [typeChoice, timeRangeChoice]);
+
+    console.log(data.data);
+
+    if (typeof data === "undefined" || typeof data.data === "undefined") return <p>null</p>;
+
+    const mapped = data?.data.map((entry: APIArtistObject|APITrackObject, key: number) => {
+        return <li key={key}>{entry.name}</li>;
+    })
+
+    if (data?.data.length === 0) {
+        return <code>Loading...</code>;
+    } else {
+        return (
+            <>
+            <i>Data type</i>: {data?.type} <br/>
+            <i>Time period</i>: {data?.time_range}
+            <ul>{mapped}</ul>
+            </>
+        );
+    }
+}
+
+function ArtistTracksWidget(props: {
+    accessToken: string,
+    artistName: string,
+    artistTracks: Array<APITrackObject>
+}) {
+    if (props.artistName === undefined || props.artistTracks === undefined) return null;
+    const mappedTracks = props.artistTracks.map((track: APITrackObject, key: number) => {
+        return (
+            <li key={key}>
+                <b>{track.name}</b> - <i>{track.album.name}</i>
+            </li>
+        );
+    });
+    const handleClick = async (event: BaseSyntheticEvent) => { // this is where I call the createArtistPlaylist function
+        console.log(event.target);
+        createArtistPlaylist(props.accessToken, props.artistName, props.artistTracks);
+    }
+    return (
+        <div>
+            <hr/>
+            <h3>{props.artistName}</h3>
+            <button type="button" onClick={handleClick}>Click</button>
+            {mappedTracks} <br/>
+            <hr/>
+        </div>
+    );
+}
+
 export function SeeArtistAllTracks(props: {accessToken: string, refreshToken: string}) {
+    /* Renders some text whilst the computing is being done, then renders a list of all the artists */
 
     const [ numberOfPlaylists, setNumberOfPlaylists ] = useState<number>(0);
     const [ numberOfSavedTracks, setNumberOfSavedTracks ] = useState<number>(0);
-    // const [ artistsAndTracks, setArtistsAndTracks ] = useState<ArtistsAndTracks>({});
+    const [ artistsAndTracks, setArtistsAndTracks ] = useState<ArtistsAndTracks>({});
     const [ playlistProgress, setPlaylistProgress ] = useState<number>(0);
     const [ trackProgress, setTrackProgress ] = useState<number>(0);
+
+    const [ toggled, setToggled ] = useState<boolean>(false);
+    const [ chosenArtist, setChosenArtist ] = useState<string>("");
     // const forceRerender = useForceRerender();
     
-    useEffect(() => {
-
-        // fetchNumberOfPlaylists(props.accessToken).then(data => setNumberOfPlaylists(data));
-        // fetchNumberOfSavedTracks(props.accessToken).then(data => setNumberOfSavedTracks(data));
+    const handleBeginButtonClick = () => { // was a useEffect
+        setToggled(true);
         async function fetchTotals() {
-            const numofPlaylists = await fetchNumberOfPlaylists(props.accessToken);
+            const numofPlaylists = await fetchNumberOfPlaylists(props.accessToken, true);
             const numofTracks = await fetchNumberOfSavedTracks(props.accessToken);
             console.log(numofPlaylists);
             console.log(numofTracks);
             await setNumberOfPlaylists(numofPlaylists);
             await setNumberOfSavedTracks(numofTracks);
-            // console.log("Number of playlists:", numberOfPlaylists);
-            // console.log("Number of saved tracks:", numberOfSavedTracks);
         }
-
-        fetchTotals();
-
         async function fetchData() {
             const start = performance.now();
             const generator = fetchAllArtistsAndTracks2(props.accessToken, props.refreshToken);
@@ -124,15 +236,26 @@ export function SeeArtistAllTracks(props: {accessToken: string, refreshToken: st
                     const [ type, count ] = entry;
                     if (!type) setPlaylistProgress(count);
                     else setTrackProgress(count);
+                } else {
+                    setArtistsAndTracks(entry);
                 }
             }
             const end = performance.now();
             console.log("Time taken:", end-start);
         }
+        fetchTotals();
         fetchData();
-    }, [props.accessToken]);
+    }
 
-    return (
+    const beginButton = <button type="button" onClick={handleBeginButtonClick}>Click to begin</button>;
+
+    const handleLIOnclick = (event: BaseSyntheticEvent) => {
+        console.log(event.target.innerHTML);
+        setChosenArtist(event.target.innerHTML);
+        window.scrollTo(0,0);
+    }
+
+    const progressDiv = (
         <div>
             <code>Processing...</code>
             <br/>
@@ -147,86 +270,25 @@ export function SeeArtistAllTracks(props: {accessToken: string, refreshToken: st
             </label>
         </div>
     );
-}
 
-/*
-export function SeeArtistAllTracks(props: {accessToken: string, refreshToken: string}) {
-    const [ totalPlaylists, setTotalPlaylists ] = useState<number>(0);
-    const [ progress, setProgress ] = useState<any>(0);
-    const [ artistsAndTracks, setArtistsAndTracks ] = useState<ArtistsAndTracks>({});
-    const [ chosenArtist, setChosenArtist ] = useState<string>("");
-    // const forceRerender = useForceRerender();
-    
-    useEffect(() => {
-        async function fetchData() {
-            const numberOfPlaylists = await fetchNumberOfPlaylists(props.accessToken);
-            await setTotalPlaylists(numberOfPlaylists);
+    if (!areEqual(artistsAndTracks, {})) console.log(artistsAndTracks);
 
-            const generator = fetchAllArtistsAndTracks2(props.accessToken, props.refreshToken);
-            for await (let item of generator) {
-                if (item instanceof Array) {
-                    const [ count, playlistName, keys] = item;
-                    // await setProgress(`Processing playlist #${count} - "${playlistName}"`);
-                    await setProgress(item);
-                } else {
-                    await setArtistsAndTracks(item);
-                    await setProgress("");
-                }
-            }
-        }
-        fetchData();
-    }, [])
-
-    if (areEqual(artistsAndTracks, {})) {
-        return (
-            <>
-            <code>{`Processing playlist #${progress[0]} - "${progress[1]}"`}</code> <br/>
-            <progress max={totalPlaylists} value={progress[0]}>%</progress>
-            </>
-        );
-    }
-    
-    const handleDatalistChange = async (event: BaseSyntheticEvent) => {
-        // console.log(event.target.value);
-        setChosenArtist(event.target.value);
-    }
-
-    const datalistData = (areEqual(artistsAndTracks, {}))
-        ? []
-        : Object.keys(artistsAndTracks);
-
-    const defaultOption = (progress === "")
-        ? null
-        : progress;
-    
-    const artistSongs = (chosenArtist === "" || areEqual(artistsAndTracks, {}) || !Object.keys(artistsAndTracks).includes(chosenArtist))
-        ? null
-        : artistsAndTracks[chosenArtist].map((track: APITrackObject, key: number) => {
-            const song = <b>{track.name}</b>;
-            // const artists = track.artists.map((artist: SubArtistObj) => artist.name);
-            const album = <i>{track.album.name}</i>;
-            return <li key={key}>{song} - {album}</li>;
-        })
-    
-    const artisth3 = (!Object.keys(artistsAndTracks).includes(chosenArtist))
-        ? null
-        : chosenArtist;
+    const chosenArtistTracks = Object.entries(artistsAndTracks)?.filter((entry: Array<any>) => entry[1] !== chosenArtist)
 
     return (
-        <div>
-            <Datalist
-                data={datalistData}
-                onChange={handleDatalistChange}
-                defaultOption={defaultOption} />
+        <>
+        {beginButton} <br/>
 
-            <div>
-                <h3>{artisth3}</h3>
-                <ul>
-                    {artistSongs}
-                </ul>
-            </div>
+        {(toggled && areEqual(artistsAndTracks, {})) ? progressDiv : null}
 
-        </div>
+        <ArtistTracksWidget
+            accessToken={props.accessToken}
+            artistName={chosenArtist}
+            artistTracks={artistsAndTracks[chosenArtist]}/>
+
+        <ArtistLIs
+            artistNames={Object.keys(artistsAndTracks).sort()}
+            onClick={handleLIOnclick} />
+        </>
     );
 }
-*/

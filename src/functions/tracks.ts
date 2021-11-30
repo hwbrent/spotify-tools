@@ -10,7 +10,8 @@ import {
     x_www_form_urlencoded,
     APIRateLimitExceeded,
     AccessTokenExpired,
-    refreshAccessToken
+    refreshAccessToken,
+    requestParamObject
 } from "./general-functions";
 
 import {
@@ -27,6 +28,26 @@ import { json } from "stream/consumers";
 
 require("dotenv").config();
 
+/* fetches */
+export async function fetchUserTopItems(
+    accessToken: string,
+    limit: number = 15,
+    offset: number = 0,
+    type: string = "artists", // "artists" or "tracks"
+    time_range: string = "medium_term", // "long term" (years of data), "medium_term" (~6 months), "short_term" (~ 4 weeks)
+) {
+    const params = {
+        limit: limit,
+        offset: offset,
+        time_range: time_range
+    }
+    const response = await fetch(
+        "https://api.spotify.com/v1/me/top/" + type + "/?" + x_www_form_urlencoded(params),
+        requestParamObject(accessToken)
+    );
+    return response;
+}
+
 // literally just returns the total number of saved tracks
 export async function fetchNumberOfSavedTracks(accessToken: string) {
     let count = 0;
@@ -35,13 +56,7 @@ export async function fetchNumberOfSavedTracks(accessToken: string) {
             limit: 50,
             offset: i
         });
-        const response = await fetch("https://api.spotify.com/v1/me/tracks/?" + params, {
-            method: "GET",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${accessToken}`
-            }
-        });
+        const response = await fetch("https://api.spotify.com/v1/me/tracks/?" + params, requestParamObject(accessToken));
         const data = await response.json();
 
         if (response.status !== 200) {
@@ -63,13 +78,7 @@ async function fetchTrackData(accessToken: string, limit: number, offset: number
             limit: limit,
             offset: offset
         });
-        const response = await fetch("https://api.spotify.com/v1/me/tracks/?" + params, {
-            method: "GET",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${accessToken}`
-            }
-        });
+        const response = await fetch("https://api.spotify.com/v1/me/tracks/?" + params, requestParamObject(accessToken));
         return response;
     }
     let response = await fetchData();
@@ -99,13 +108,7 @@ async function fetchTrackData(accessToken: string, limit: number, offset: number
 export async function fetchTracksFromPlaylistTracksHREF(accessToken: string, href: string, currentUserProfile: APIUserObject) {
     // https://api.spotify.com/v1/playlists/{ playlist id }/tracks
 
-    const response = await fetch(href, {
-        method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${accessToken}`
-        }
-    });
+    const response = await fetch(href, requestParamObject(accessToken));
     const data = await response.json();
 
     if (response.status !== 200) {
@@ -143,19 +146,13 @@ export async function fetchTracksFromPlaylistTracksHREF2(accessToken: string, hr
     // console.log("fetching tracks from playlist href...");
     // https://api.spotify.com/v1/playlists/{ playlist id }/tracks
 
-    const response = await fetch(href, {
-        method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${accessToken}`
-        }
-    });
+    const response = await fetch(href, requestParamObject(accessToken));
     // console.log(response.status);
     const data = await response.json();
 
     if (response.status !== 200) {
-        console.error(response);
-        console.error(data);
+        console.error(data.error);
+
         if (areEqual(data, AccessTokenExpired)) {
             alert("Sorry, your access token expired. The page will reload - please try again.");
             refreshAccessToken();
@@ -167,9 +164,7 @@ export async function fetchTracksFromPlaylistTracksHREF2(accessToken: string, hr
     interface TrackItem {
         "added_at": string,
         "added_by": {
-            "external_urls": {
-                "spotify": string
-            },
+            "external_urls": {"spotify": string},
             "href": string,
             "id": string,
             "type": string,
@@ -178,12 +173,9 @@ export async function fetchTracksFromPlaylistTracksHREF2(accessToken: string, hr
         "is_local": boolean,
         "primary_color": any, // was `null` in obj I copied but idk what else it could be :/
         "track": APITrackObject,
-        "video_thumbnail": {
-            "url": any // was `null` in obj I copied but idk what else it could be :/
-        }
+        "video_thumbnail": {"url": any /* was `null` in obj I copied but idk what else it could be :/*/}
     }
 
-    // console.log(data);
     const tracks = data.items.filter((track: TrackItem) => track.added_by.id === currentUserProfile.id);
     
     return tracks.map((entry: TrackItem) => entry.track);
