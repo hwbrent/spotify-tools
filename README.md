@@ -1,3 +1,14 @@
+To go from development to build:
+- ~~Change `REACT_APP_BASE_URI` variable in `.env` to `https://hwbrent-spotify-tools.netlify.app/`~~ (I was wrong - `.env` is included in `.gitignore` so Netlify wouldn't have access to it)
+- Change app's Callback URI on the Spotify Developer Dashboard to `https://hwbrent-spotify-tools.netlify.app/callback`
+
+To go from build to development:
+- Change `REACT_APP_BASE_URI` in `.env` to `http://localhost:3000/` (this is definitely necessary)
+- Change app's Callback URI on the Spotify Developer Dashboard to `http://localhost:3000/callback`
+- enter `npm start` in terminal to start up the development server
+
+--------
+
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).

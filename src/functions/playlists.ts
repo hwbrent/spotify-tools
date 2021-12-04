@@ -11,7 +11,8 @@ import {
     AccessTokenExpired,
     refreshAccessToken,
     delay,
-    requestParamObject
+    requestParamObject,
+    playlistsToIgnore
 } from "./general-functions";
 import { 
     fetchAllSavedTracks
@@ -83,45 +84,54 @@ export async function fetchPlaylist(accessToken: string, limit: number, offset: 
     return data.items[0];
 }
 
-export async function fetchNumberOfPlaylists(accessToken: string, userOwned: boolean = false) {
+export async function fetchNumberOfPlaylists(accessToken: string, userOwned: boolean = false) { // messy af, need to refactor
     const currentUser = await fetchCurrentUserProfile(accessToken);
+
+    const ignoredPlaylists: Array<string> = [];
+
     let count = 0;
     let ownedCount = 0;
-    for (let i = 0;; i += 50) {
-        const params = x_www_form_urlencoded({
-            limit: 50,
-            offset: i
-        });
-        const response = await fetch("https://api.spotify.com/v1/me/playlists/?" + params, requestParamObject(accessToken));
-        const data = await response.json();
 
-        if (response.status !== 200) {
-            console.error(response);
-            console.error(data);
-            if (areEqual(data, AccessTokenExpired)) {
-                alert("Sorry, your access token expired. The page will reload - please try again.");
-                refreshAccessToken();
-            }
-        }
+    let i = 0;
+    // for (let i = 0;; i += 50) {
+    while (true) {
+        console.log(i);
+        const data = await fetchPlaylistData(accessToken, 50, i);
 
-        if (data.items.length === 0) break;
+        console.log(data);
+
+        if (typeof data === "undefined") break;
+        // if (typeof data.items === "undefined") break;
+        if (data.length === 0) break;
         
-        // if (userOwned) {
-        //     const userOwnedPlaylists = data.items.filter((playlist: APIPlaylistObject) => playlist.id !== currentUser.id);
-        //     // console.log(data.items.length, "vs", userOwnedPlaylists.length);
-        //     count += userOwnedPlaylists.length
-        // } else {
-        //     count += data.items.length;
-        // }
-        const userOwnedPlaylists = data.items.filter((playlist: APIPlaylistObject) => playlist.id !== currentUser.id);
+        // const userOwnedPlaylists = data.items.filter((playlist: APIPlaylistObject) => playlist.id !== currentUser.id);
+        const userOwnedPlaylists = data.filter((playlist: APIPlaylistObject) => {
+            if (playlistsToIgnore.includes(playlist.name)) {
+                ignoredPlaylists.push(playlist.name);
+                return;
+            }
+            else if (playlist.owner.id !== currentUser.id) {
+                ignoredPlaylists.push(playlist.name);
+                return;
+            }
+            else return playlist;
+        });
+
+        if (userOwnedPlaylists.length === 0) break;
+
         ownedCount += userOwnedPlaylists.length;
-        count += data.items.length
+        count += data.length
+        
+        if (userOwned) i += userOwnedPlaylists.length;
+        else i += data.length;
     }
-    console.log(count,"vs", ownedCount);
-    return count;
+    console.log("ignored playlists:", Array.from(new Set(ignoredPlaylists)));
+    if (userOwned) return ownedCount;
+    else return count;
 }
 
-async function fetchPlaylistData(accessToken: string, limit: number, offset: number) {
+export async function fetchPlaylistData(accessToken: string, limit: number, offset: number) {
+
     async function fetchData() {
         const params = x_www_form_urlencoded({
             limit: limit,
@@ -130,11 +140,12 @@ async function fetchPlaylistData(accessToken: string, limit: number, offset: num
         const response = await fetch("https://api.spotify.com/v1/me/playlists/?" + params, requestParamObject(accessToken));
         return response;
     }
+
     let response = await fetchData();
     let data = await response.json();
 
     if (response.status !== 200) {
-        console.log(data.error);
+        console.error(data.error);
         if (areEqual(data, AccessTokenExpired)) {
             alert("Sorry, your access token expired. The page will reload - please try again.");
             refreshAccessToken();

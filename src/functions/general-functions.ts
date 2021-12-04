@@ -14,7 +14,8 @@ import {
 // functions pertaining to Spotify Playlists:
 import {
     fetchPlaylist,
-    fetchAllPlaylists
+    fetchAllPlaylists,
+    fetchPlaylistData
 } from "./playlists";
 
 // functions pertaining to Spotify Artists:
@@ -61,7 +62,7 @@ export const AccessTokenExpired = {
     }
 };
 
-const playlistsToIgnore = [
+export const playlistsToIgnore = [
     'Various Artists – The Workout Mix 2015',
     'hyped',
     'Mentos Refreshed pure mcnent',
@@ -161,7 +162,7 @@ export async function requestAuth() {
         // code_challenge: ""
     };
 
-    console.log(params);
+    console.log(params.redirect_uri);
 
     const redirect = 'https://accounts.spotify.com/authorize?' + x_www_form_urlencoded(params);
     window.location.replace(redirect);
@@ -202,7 +203,6 @@ export async function fetchToken(code: string) {
 export function refreshAccessToken() {
     const uri = `${process.env.REACT_APP_BASE_URI + "?refresh"}` || "https://hwbrent-spotify-tools.netlify.app/?refresh";
     window.location.replace(uri);
-    // window.location.replace("http://localhost:3000/?refresh");
 }
 
 export function useForceRerender(){
@@ -213,13 +213,9 @@ export function useForceRerender(){
 
 /*
 *** Using access token: ***
-
 - You make the appropriate HTTP verb request to "https://api.spotify.com/"
-
-You need to include the following header in every API call:
-
-{"Authorization" : `Bearer ${accessToken}`}
-
+- You need to include the following header in every API call:
+    - {"Authorization" : `Bearer ${accessToken}`}
 */
 
 export async function fetchCurrentUserProfile(accessToken: string) {
@@ -248,18 +244,18 @@ export async function fetchUserTopItems(
     limit: number = 15,
     offset: number = 0,
     type: string = "artists", // "artists" or "tracks"
-    time_range: string = "medium_term", // "long term" (years of data), "medium_term" (~6 months), "short_term" (~ 4 weeks)
+    time_range: string = "medium_term", // "long_term" (years of data), "medium_term" (~6 months), "short_term" (~ 4 weeks)
 ) {
     const params = {
         limit: limit,
         offset: offset,
         time_range: time_range
-    }
+    };
     const response = await fetch(
         "https://api.spotify.com/v1/me/top/" + type + "/?" + x_www_form_urlencoded(params),
         requestParamObject(accessToken)
     );
-    const data = await response.json()
+    const data = await response.json();
 
     if (response.status !== 200) {
         console.error(response);
@@ -267,14 +263,14 @@ export async function fetchUserTopItems(
     }
 
     const time_period_match = Object.entries(time_period).filter((array: Array<string>) => {
-        if (array[0] === time_range) return array
+        if (array[0] === time_range) return array;
     })
 
     const returnData = {
         type: type,
         time_range: time_period_match[0].join(" - ").replace("_", " "),
         data: data.items
-    }
+    };
 
     return returnData;
 }
@@ -385,4 +381,80 @@ export async function* fetchAllArtistsAndTracks2(accessToken: string, refreshTok
 
     yield artistsAndTracks;
     return artistsAndTracks;
+}
+
+export async function* fetchAllArtistsAndTracks3(accessToken: string, refreshToken?: string) {
+    const artistsAndTracks: {[artist: string]: Array<APITrackObject>} = {}; // this is what's returned
+    /*
+    - Fetch ALL the playlists
+    - then fetch all the songs from those playlists
+    - then fetch all the user tracks
+    */
+
+    const batchSize = 50;
+
+    const currentUserProfile = await fetchCurrentUserProfile(accessToken);
+
+    const ignoredPlaylists: Array<string> = [];
+
+    let count = 0;
+    while (true) {
+        let data = await fetchPlaylistData(accessToken, batchSize, count);
+        if (typeof data === "undefined") break;
+        
+        // filtering out unwanted playlists and playlists not owned by the user
+        data = data.filter((playlist: APIPlaylistObject) => {
+            if (playlistsToIgnore.includes(playlist.name)) {
+                ignoredPlaylists.push(playlist.name);
+                return;
+            }
+            else if (playlist.owner.id !== currentUserProfile.id) {
+                ignoredPlaylists.push(playlist.name);
+                return;
+            }
+            else return playlist;
+        });
+        if (data.length === 0) break;
+
+        let count2 = 0;
+        for (let playlist of data) {
+            const tracks = await fetchTracksFromPlaylistTracksHREF2(accessToken, playlist.tracks.href, currentUserProfile);
+
+            for (let track of tracks) {
+                const artists = track.artists.map((obj: ArtistFromTrack) => obj.name);
+                artists.forEach((artist: string) => {
+                    if (!Object.keys(artistsAndTracks).includes(artist)) { // 1. artist isn't in `artistsAndTracks`
+                        artistsAndTracks[artist] = [track];
+                    } else if (!artistsAndTracks[artist].some((artistTrack: APITrackObject) => artistTrack.id === track.id)) { // 2. artist is there but track isn't
+                        artistsAndTracks[artist].push(track);
+                    } // else –- artist and track are already there, so do nothing
+                });
+            }
+            count2 += 1;
+            yield [0, count + count2];
+        }
+        if (data.length === 0) break;
+        count += data.length;
+    }
+    console.log(count);
+
+    let trackCount = 0;
+    const allSavedTracks = fetchAllSavedTracks(accessToken, 50);
+    for await (let trackBatch of allSavedTracks) {
+        for (let track of trackBatch) {
+            const artists = track.artists.map((obj: ArtistFromTrack) => obj.name);
+            artists.forEach((artist: string) => {
+                if (!Object.keys(artistsAndTracks).includes(artist)) { // 1.
+                    artistsAndTracks[artist] = [track];
+                } else if (!artistsAndTracks[artist].some((artistTrack: APITrackObject) => artistTrack.id === track.id)) { // 2.
+                    artistsAndTracks[artist].push(track);
+                }
+            });
+            trackCount += 1;
+            yield [1, trackCount];
+        }
+    }
+
+    console.log("ignored playlists 2:", Array.from(new Set(ignoredPlaylists)));
+    yield artistsAndTracks;
 }

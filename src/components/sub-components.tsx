@@ -5,6 +5,7 @@ import "../App.css";
 import {
     areEqual,
     fetchAllArtistsAndTracks2,
+    fetchAllArtistsAndTracks3,
     fetchUserTopItems,
     useForceRerender,
     time_period
@@ -101,24 +102,44 @@ interface ArtistLIsProps {
 }
 export function ArtistLIs(props: ArtistLIsProps) {
     const mappedNames = props.artistNames.map((name: string, key: number) => (
-        <li key={key} onClick={props.onClick}>{name}</li>
+        <li className="ArtistLI" key={key} onClick={props.onClick}>{name}</li>
     ))
     return <ul>{mappedNames}</ul>;
 }
 
 export function ListOfPlaylistNames(props: {accessToken: string}) {
     // const [ playlistNames, setPlaylistNames ] = useState<Array<string>>([]);
-    const [ playlistNames, setPlaylistNames ] = useState<Array<Array<string>>>([]);
+    let [ playlistNames, setPlaylistNames ] = useState<Array<Array<string>>>([]);
+    let [ mapped, setMapped ] = useState<Array<Array<string>>>([]);
 
     useEffect(() => {
         async function fetchData() {
             const response = await fetchAllPlaylistNames(props.accessToken);
             setPlaylistNames(response);
+            setMapped(response); // if I don't include this line, nothing will appear until after the user interacts with the checkbox
         }
         fetchData();
     }, []);
 
-    const mapped = playlistNames.map((entry: any, key: number) => {
+    const toggleSorted = (
+        <label>
+            Sorted:
+            <input type="checkbox" onChange={async (event: BaseSyntheticEvent) => {
+                // if the box is checked, set `mapped` to be the sorted version of playlistNames
+                // else, set `mapped` just be playlistNames
+                if (playlistNames.length === 0) return;
+                if (event.target.checked) {
+                    let copy = await [...playlistNames];
+                    await copy.sort();
+                    setMapped(copy);
+                } else {
+                    setMapped(playlistNames);
+                }
+            }}/>
+        </label>
+    );
+
+    const mappedPlaylistNames = mapped?.map((entry: any, key: number) => {
         return (
         <li key={key}>
             <b>{entry[0]}</b> - <i>{entry[1]}</i>
@@ -130,8 +151,9 @@ export function ListOfPlaylistNames(props: {accessToken: string}) {
     
     return (
         <>
+        {toggleSorted} <br/>
         <i>Total number of playlists: {playlistNames.length}</i>
-        <ul>{mapped}</ul>
+        <ul>{mappedPlaylistNames}</ul>
         </>
     );
 }
@@ -149,18 +171,61 @@ export function SeeUserTop(props: {accessToken: string}) {
 
     useEffect(() => {
         async function fetchData() {
-            const response = await fetchUserTopItems(props.accessToken, 15, 0, "tracks");
+            const response = await fetchUserTopItems(props.accessToken, 15, 0, typeChoice, timeRangeChoice);
             setData(response);
         }
         fetchData();
     }, [typeChoice, timeRangeChoice]);
 
-    console.log(data.data);
+    const dataTypeRadios = (
+        <form
+            onChange={(event: BaseSyntheticEvent) => setTypeChoice(event.target.id)}
+            style={{paddingLeft: "2%"}}
+        >
+        <label>
+            Artists:
+            <input type="radio" name="radio" id="artists"/>
+        </label> <br/>
+        <label>
+            Tracks:
+            <input type="radio" name="radio" id="tracks"/>
+        </label>
+        </form>
+    );
 
-    if (typeof data === "undefined" || typeof data.data === "undefined") return <p>null</p>;
+    const timeRangeRadios = (
+        <form
+            onChange={(event: BaseSyntheticEvent) => setTimeRangeChoice(event.target.id)}
+            style={{paddingLeft: "2%"}}
+        >
+            <label>
+                Long term:
+                <input type="radio" name="radio" id="long_term"/>
+            </label> <br/>
+            <label>
+                Medium term (default):
+                <input type="radio" name="radio" id="medium_term"/>
+            </label> <br/>
+            <label>
+                Short term:
+                <input type="radio" name="radio" id="short_term"/>
+            </label>
+        </form>
+    );
+    
+    // console.log(data.data);
 
-    const mapped = data?.data.map((entry: APIArtistObject|APITrackObject, key: number) => {
-        return <li key={key}>{entry.name}</li>;
+    if (typeof data === "undefined" || typeof data.data === "undefined") return <code>Awaiting data...</code>;
+
+    const mapped = data?.data.map((entry: any, key: number) => { // (entry: any) is dodgy but couldn't get this to work otherwise
+        let innerHTML;
+        if (entry.type === "artist") {
+            innerHTML = <b>{entry.name}</b>;
+        } else {
+            const artists = entry.artists.map((artist: any) => artist.name).join(", ");
+            innerHTML = <><b>{entry.name}</b> - <i>{artists}</i></>;
+        }
+        return <li key={key}>{innerHTML}</li>;
     })
 
     if (data?.data.length === 0) {
@@ -168,8 +233,13 @@ export function SeeUserTop(props: {accessToken: string}) {
     } else {
         return (
             <>
-            <i>Data type</i>: {data?.type} <br/>
-            <i>Time period</i>: {data?.time_range}
+            <i><b>Data type</b></i>: {data?.type}
+            <br/>
+            {dataTypeRadios}
+            <i><b>Time period</b></i>: {data?.time_range}
+            <br/>
+            {timeRangeRadios}
+            <hr/>
             <ul>{mapped}</ul>
             </>
         );
@@ -196,8 +266,8 @@ function ArtistTracksWidget(props: {
     return (
         <div>
             <hr/>
-            <h3>{props.artistName}</h3>
-            <button type="button" onClick={handleClick}>Click</button>
+            <h3 style={{display: "inline-block"}}>{props.artistName}</h3>
+            <button type="button" onClick={handleClick}>Click to generate artist playlist</button>
             {mappedTracks} <br/>
             <hr/>
         </div>
@@ -217,7 +287,7 @@ export function SeeArtistAllTracks(props: {accessToken: string, refreshToken: st
     const [ chosenArtist, setChosenArtist ] = useState<string>("");
     // const forceRerender = useForceRerender();
     
-    const handleBeginButtonClick = () => { // was a useEffect
+    useEffect(() => {
         setToggled(true);
         async function fetchTotals() {
             const numofPlaylists = await fetchNumberOfPlaylists(props.accessToken, true);
@@ -229,9 +299,9 @@ export function SeeArtistAllTracks(props: {accessToken: string, refreshToken: st
         }
         async function fetchData() {
             const start = performance.now();
-            const generator = fetchAllArtistsAndTracks2(props.accessToken, props.refreshToken);
+            const generator = fetchAllArtistsAndTracks3(props.accessToken, props.refreshToken);
             for await (let entry of generator) {
-                console.log(entry);
+                // console.log(entry);
                 if (entry instanceof Array) {
                     const [ type, count ] = entry;
                     if (!type) setPlaylistProgress(count);
@@ -243,14 +313,22 @@ export function SeeArtistAllTracks(props: {accessToken: string, refreshToken: st
             const end = performance.now();
             console.log("Time taken:", end-start);
         }
-        fetchTotals();
-        fetchData();
-    }
+        /*
+        - The issue I was having previously was that I was getting loads of API Rate Limit Exceeded error
+        - I was so confused as to why - I rewrote my fetchArtistsAndTracks generator twice to no avail
+        - I realised it was because I called fetchTotals() and fetchData() without saying await
+        - Including the below mini-funciton doAll() fixed this issue
+        */
+        async function doAll() {
+            await fetchTotals();
+            await fetchData();
+        }
+        doAll();
+    }, []);
 
-    const beginButton = <button type="button" onClick={handleBeginButtonClick}>Click to begin</button>;
+    // const beginButton = <button type="button" onClick={handleBeginButtonClick}>Click to begin</button>;
 
     const handleLIOnclick = (event: BaseSyntheticEvent) => {
-        console.log(event.target.innerHTML);
         setChosenArtist(event.target.innerHTML);
         window.scrollTo(0,0);
     }
@@ -271,13 +349,13 @@ export function SeeArtistAllTracks(props: {accessToken: string, refreshToken: st
         </div>
     );
 
-    if (!areEqual(artistsAndTracks, {})) console.log(artistsAndTracks);
+    // if (!areEqual(artistsAndTracks, {})) console.log(artistsAndTracks);
 
     const chosenArtistTracks = Object.entries(artistsAndTracks)?.filter((entry: Array<any>) => entry[1] !== chosenArtist)
 
     return (
         <>
-        {beginButton} <br/>
+        {/* {beginButton} <br/> */}
 
         {(toggled && areEqual(artistsAndTracks, {})) ? progressDiv : null}
 

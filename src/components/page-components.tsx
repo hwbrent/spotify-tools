@@ -17,7 +17,8 @@ import {
     fetchCurrentUserProfile,
     useForceRerender,
     refreshAccessToken,
-    fetchUserTopItems
+    fetchUserTopItems,
+    fetchAllArtistsAndTracks3
 } from "../functions/general-functions";
 import { fetchAllSavedTracks, fetchNumberOfSavedTracks } from "../functions/tracks";
 import {
@@ -107,6 +108,7 @@ export function Callback() {
 
 export function TokenAcquired() {
     console.log("Loaded <TokenAcquired/>");
+    // console.log(new Date().getTime());
     /*
     This will be the main component where the user does all their customising stuff
     */
@@ -133,15 +135,14 @@ export function TokenAcquired() {
             setAccessToken(url_access_token);
             setRefreshToken(url_refresh_token);
 
-            if (accessToken !== "") {
-                fetchCurrentUserProfile(accessToken)
-                    .then(response => {
-                        setCurrentUserProfile(response);
-                    })
-                    .catch(error => console.error(error));
+            async function fetchData(accessToken: string) {
+                const response = await fetchCurrentUserProfile(accessToken);
+                setCurrentUserProfile(response);
             }
+            
+            fetchData(accessToken);
         },
-        []
+        [accessToken] // to allow currentUserProfile to update
     );
 
     if (accessToken.length === 0) return <p>Nooo...</p>;
@@ -151,11 +152,9 @@ export function TokenAcquired() {
             DO NOT PRESS THIS BUTTON - THIS IS FOR THE DEVELOPER TO USE
             <button type="button" onClick={async () => {
                 if (accessToken.length !== 0) {
-                    const data = await fetchUserTopItems(accessToken);
-                    console.log(data);
+                    const generator = fetchAllArtistsAndTracks3(accessToken);
+                    for await (let entry of generator) console.log(entry);
                 }
-                /* alert("Access token expired - getting new one...");
-                refreshAccessToken(); */
             }}>Click</button>
         </label>
     );
@@ -178,7 +177,7 @@ export function TokenAcquired() {
         <p>Your refresh token is: <br/> {refreshToken}</p> 
         <hr /> */}
         {testButton} <hr />
-        {chosenPage}
+        {chosenPage || "Welcome to my app! Please make yourself at home. Choose an option from the options on the left to get started."}
         </>
     );
 
