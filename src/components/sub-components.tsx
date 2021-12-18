@@ -283,7 +283,7 @@ export function SeeArtistAllTracks(props: {accessToken: string, refreshToken: st
     const [ playlistProgress, setPlaylistProgress ] = useState<number>(0);
     const [ trackProgress, setTrackProgress ] = useState<number>(0);
 
-    const [ toggled, setToggled ] = useState<boolean>(false);
+    const [ toggled, setToggled ] = useState<boolean>(false); // redundant now...?
     const [ chosenArtist, setChosenArtist ] = useState<string>("");
     // const forceRerender = useForceRerender();
     
@@ -353,11 +353,18 @@ export function SeeArtistAllTracks(props: {accessToken: string, refreshToken: st
 
     const chosenArtistTracks = Object.entries(artistsAndTracks)?.filter((entry: Array<any>) => entry[1] !== chosenArtist)
 
+    const instructions = (
+        "Click on an artist's name to see the tracks of theirs that you have in your Spotify library across all your playlists and saved tracks.\n" +
+        "Click on the button next to their name to create a Spotify playlist comprised of the aforementioned tracks."
+    );
+
     return (
         <>
         {/* {beginButton} <br/> */}
 
         {(toggled && areEqual(artistsAndTracks, {})) ? progressDiv : null}
+
+        {(toggled && !areEqual(artistsAndTracks, {})) ? <p>instructions</p> : null}
 
         <ArtistTracksWidget
             accessToken={props.accessToken}

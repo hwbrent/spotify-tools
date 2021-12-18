@@ -150,7 +150,8 @@ export function TokenAcquired() {
     const testButton = (
         <label>
             DO NOT PRESS THIS BUTTON - THIS IS FOR THE DEVELOPER TO USE
-            <button type="button" onClick={async () => {
+            <button disabled type="button" onClick={async () => {
+                if (currentUserProfile?.display_name !== "Henry Brent") return;
                 if (accessToken.length !== 0) {
                     const generator = fetchAllArtistsAndTracks3(accessToken);
                     for await (let entry of generator) console.log(entry);
